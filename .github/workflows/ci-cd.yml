@@ -57,6 +57,10 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     needs: [test, lint]
+    outputs:
+      artifact_present: ${{ steps.set-outputs.outputs.artifact_present }}
+      artifact_name: ${{ steps.set-outputs.outputs.artifact_name }}
+      artifact_src: ${{ steps.set-outputs.outputs.artifact_src }}
     
     steps:
       - name: Checkout code
@@ -79,25 +83,34 @@ jobs:
           echo "Workspace contents:" && ls -la
           echo ".output contents (if any):" && ls -la .output || true
           echo ".nuxt contents (if any):" && ls -la .nuxt || true
-      
-      - name: Upload .output artifact (Nitro)
-        if: ${{ hashFiles('.output/**') != '' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-output
-          path: .output/**
-          retention-days: 7
 
-      - name: Upload .nuxt artifact (fallback)
-        if: ${{ hashFiles('.output/**') == '' && hashFiles('.nuxt/**') != '' }}
+      - name: Decide artifact source and outputs
+        id: set-outputs
+        shell: bash
+        run: |
+          echo "artifact_name=build-output" >> $GITHUB_OUTPUT
+          if compgen -G ".output/**" > /dev/null; then
+            echo "artifact_present=true" >> $GITHUB_OUTPUT
+            echo "artifact_src=.output/**" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          if compgen -G ".nuxt/**" > /dev/null; then
+            echo "artifact_present=true" >> $GITHUB_OUTPUT
+            echo "artifact_src=.nuxt/**" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          echo "artifact_present=false" >> $GITHUB_OUTPUT
+      
+      - name: Upload build artifact
+        if: ${{ steps.set-outputs.outputs.artifact_present == 'true' }}
         uses: actions/upload-artifact@v4
         with:
-          name: build-output
-          path: .nuxt/**
+          name: ${{ steps.set-outputs.outputs.artifact_name }}
+          path: ${{ steps.set-outputs.outputs.artifact_src }}
           retention-days: 7
 
       - name: Fail if no build artifacts found
-        if: ${{ hashFiles('.output/**') == '' && hashFiles('.nuxt/**') == '' }}
+        if: ${{ steps.set-outputs.outputs.artifact_present != 'true' }}
         run: |
           echo "No build artifacts found in .output or .nuxt after build." >&2
           exit 1
@@ -106,7 +119,7 @@ jobs:
     name: Deploy Preview
     runs-on: ubuntu-latest
     needs: build
-    if: github.event_name == 'pull_request' && needs.build.result == 'success'
+    if: github.event_name == 'pull_request' && needs.build.result == 'success' && needs.build.outputs.artifact_present == 'true'
     
     steps:
       - name: Checkout code
@@ -115,7 +128,7 @@ jobs:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: build-output
+          name: ${{ needs.build.outputs.artifact_name }}
           path: .output
       
       - name: Deploy to Vercel (Preview)
@@ -128,7 +141,7 @@ jobs:
     name: Deploy Production
     runs-on: ubuntu-latest
     needs: build
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.build.result == 'success'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.build.result == 'success' && needs.build.outputs.artifact_present == 'true'
     
     steps:
       - name: Checkout code
@@ -137,7 +150,7 @@ jobs:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: build-output
+          name: ${{ needs.build.outputs.artifact_name }}
           path: .output
       
       - name: Deploy to Production
