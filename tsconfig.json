@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "baseUrl": ".",
+    "types": [
+      "vitest/globals",
+      "node"
+    ],
+    "paths": {
+      "@/*": ["./*"]
+    }
+  }
+}

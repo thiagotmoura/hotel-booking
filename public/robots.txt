@@ -1,0 +1,13 @@
+# Permitir todos os bots
+User-Agent: *
+Allow: /
+
+# Páginas principais
+Allow: /hotels
+Allow: /compare
+
+# Páginas restritas
+Disallow: /login
+
+# Sitemap (adicionar quando implementado)
+# Sitemap: https://hotelbooking.com.br/sitemap.xml
