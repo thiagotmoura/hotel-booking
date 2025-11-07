@@ -74,13 +74,33 @@ jobs:
       - name: Build application
         run: yarn build
       
-      - name: Upload build artifacts
+      - name: Inspect build folders (debug)
+        run: |
+          echo "Workspace contents:" && ls -la
+          echo ".output contents (if any):" && ls -la .output || true
+          echo ".nuxt contents (if any):" && ls -la .nuxt || true
+      
+      - name: Upload .output artifact (Nitro)
+        if: ${{ hashFiles('.output/**') != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: build-output
           path: .output/**
-          if-no-files-found: error
           retention-days: 7
+
+      - name: Upload .nuxt artifact (fallback)
+        if: ${{ hashFiles('.output/**') == '' && hashFiles('.nuxt/**') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: .nuxt/**
+          retention-days: 7
+
+      - name: Fail if no build artifacts found
+        if: ${{ hashFiles('.output/**') == '' && hashFiles('.nuxt/**') == '' }}
+        run: |
+          echo "No build artifacts found in .output or .nuxt after build." >&2
+          exit 1
 
   deploy-preview:
     name: Deploy Preview
